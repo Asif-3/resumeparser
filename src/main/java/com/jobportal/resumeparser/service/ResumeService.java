@@ -212,16 +212,29 @@ public class ResumeService {
                 candidate.setVerified(false);
                 candidate.setUploadedAt(LocalDateTime.now());
 
-                Candidate saved = candidateRepository.save(candidate);
+                Candidate saved;
+
+                try {
+                    saved = candidateRepository.save(candidate);
+                } catch (Exception e) {
+                    // ❌ DB failed
+                    results.add(new UploadResult(originalName, "ERROR",
+                            "Database not connected. Failed to save."));
+                    continue;
+                }
+
+// ✅ Only runs if DB success
+                results.add(new UploadResult(originalName, "SUCCESS",
+                        "Parsed and saved successfully.", saved.getId()));
+
+
 
                 log.info("UPLOAD_SUCCESS | file={} | id={} | status=Pending",
                         originalName, saved.getId());
 
-                results.add(new UploadResult(originalName, "SUCCESS",
-                        "Parsed and saved successfully.", saved.getId()));
 
             } catch (Exception e) {
-                log.error("UPLOAD_ERROR | file={} | error={}", originalName, e.getMessage(), e);
+                log.error("DB_ERROR | file={} | error={}", originalName, e.getMessage());
                 results.add(new UploadResult(originalName, "ERROR",
                         "Processing failed: " + e.getMessage()));
             }
