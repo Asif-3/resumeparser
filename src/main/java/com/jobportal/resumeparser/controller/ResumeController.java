@@ -36,31 +36,42 @@ public class ResumeController {
 
         log.info("UPLOAD_REQUEST | fileCount={}", files.length);
 
-        List<UploadResult> results = service.uploadAndProcess(files);
+        try {
+            List<UploadResult> results = service.uploadAndProcess(files);
 
-        // Categorize results for response
-        Map<String, Object> response = new HashMap<>();
-        response.put("results", results);
-        response.put("totalFiles", files.length);
+            // Categorize results for response
+            Map<String, Object> response = new HashMap<>();
+            response.put("results", results);
+            response.put("totalFiles", files.length);
 
-        long successCount = results.stream()
-                .filter(r -> "SUCCESS".equals(r.getStatus())).count();
-        long duplicateCount = results.stream()
-                .filter(r -> "DUPLICATE".equals(r.getStatus())).count();
-        long invalidCount = results.stream()
-                .filter(r -> "INVALID".equals(r.getStatus())).count();
-        long errorCount = results.stream()
-                .filter(r -> "ERROR".equals(r.getStatus())).count();
+            long successCount = results.stream()
+                    .filter(r -> "SUCCESS".equals(r.getStatus())).count();
+            long duplicateCount = results.stream()
+                    .filter(r -> "DUPLICATE".equals(r.getStatus())).count();
+            long invalidCount = results.stream()
+                    .filter(r -> "INVALID".equals(r.getStatus())).count();
+            long errorCount = results.stream()
+                    .filter(r -> "ERROR".equals(r.getStatus())).count();
 
-        response.put("successCount", successCount);
-        response.put("duplicateCount", duplicateCount);
-        response.put("invalidCount", invalidCount);
-        response.put("errorCount", errorCount);
+            response.put("successCount", successCount);
+            response.put("duplicateCount", duplicateCount);
+            response.put("invalidCount", invalidCount);
+            response.put("errorCount", errorCount);
 
-        log.info("UPLOAD_COMPLETE | success={} | duplicate={} | invalid={} | error={}",
-                successCount, duplicateCount, invalidCount, errorCount);
+            log.info("UPLOAD_COMPLETE | success={} | duplicate={} | invalid={} | error={}",
+                    successCount, duplicateCount, invalidCount, errorCount);
 
-        return ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            if ("Database connection lost. Data not saved.".equals(e.getMessage())) {
+                log.error("UPLOAD_DB_ERROR | {}", e.getMessage());
+                Map<String, String> errResponse = new HashMap<>();
+                errResponse.put("status", "ERROR");
+                errResponse.put("message", "Database connection lost. Data not saved.");
+                return ResponseEntity.status(500).body(errResponse);
+            }
+            throw e;
+        }
     }
 
     // =========================
