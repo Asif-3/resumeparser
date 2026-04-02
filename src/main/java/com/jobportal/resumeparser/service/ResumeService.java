@@ -53,6 +53,14 @@ public class ResumeService {
     // =========================
     public List<UploadResult> uploadAndProcess(MultipartFile[] files) {
 
+        // ── PRE-CHECK MONGODB CONNECTION ──
+        try {
+            candidateRepository.count();
+        } catch (Exception e) {
+            log.error("DB_PRECHECK_FAILED | error={}", e.getMessage());
+            throw new RuntimeException("Database connection lost. Data not saved.");
+        }
+
         List<UploadResult> results = new ArrayList<>();
 
         for (MultipartFile file : files) {
@@ -218,9 +226,7 @@ public class ResumeService {
                     saved = candidateRepository.save(candidate);
                 } catch (Exception e) {
                     // ❌ DB failed
-                    results.add(new UploadResult(originalName, "ERROR",
-                            "Database not connected. Failed to save."));
-                    continue;
+                    throw new RuntimeException("Database connection lost. Data not saved.");
                 }
 
 // ✅ Only runs if DB success
@@ -233,8 +239,20 @@ public class ResumeService {
                         originalName, saved.getId());
 
 
+            } catch (RuntimeException e) {
+                if ("Database connection lost. Data not saved.".equals(e.getMessage()) ||
+                        e.getClass().getName().contains("Mongo") ||
+                        e.getClass().getName().contains("DataAccess")) {
+                    throw new RuntimeException("Database connection lost. Data not saved.", e);
+                }
+                log.error("PROCESS_ERROR | file={} | error={}", originalName, e.getMessage());
+                results.add(new UploadResult(originalName, "ERROR",
+                        "Processing failed: " + e.getMessage()));
             } catch (Exception e) {
-                log.error("DB_ERROR | file={} | error={}", originalName, e.getMessage());
+                if (e.getClass().getName().contains("Mongo") || e.getClass().getName().contains("DataAccess")) {
+                    throw new RuntimeException("Database connection lost. Data not saved.", e);
+                }
+                log.error("PROCESS_ERROR | file={} | error={}", originalName, e.getMessage());
                 results.add(new UploadResult(originalName, "ERROR",
                         "Processing failed: " + e.getMessage()));
             }
